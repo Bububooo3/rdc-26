@@ -6,8 +6,8 @@
 
 -----------------------------------------------------------------------
 -- Initialize variables
-local round_length = 300 -- seconds
-local intermission_length = 45 -- seconds
+local round_length = 15 -- seconds
+local intermission_length = 5 -- seconds
 local transition_length = 10 -- seconds
 local timer = 0 -- seconds
 local dt = .5 -- seconds btwn updates
@@ -29,7 +29,7 @@ local RM = require(script:WaitForChild("RoundManager"))
 -- Utility functions
 local function teleportPlrs() ----> Move all plrs based on whether the game's going on
 	for _, plr in game.Players:GetPlayers() do
-		pcall(plr.Character.PivotTo, plr.Character, (round_ongoing) and round_spawns[RNG:NextInteger(1, num_round_spawns)] or intermission_spawn)
+		pcall(plr.Character.PivotTo, plr.Character, (round_ongoing) and round_spawns[RNG:NextInteger(1, num_round_spawns)].CFrame or intermission_spawn)
 		task.wait()
 	end
 end
@@ -51,21 +51,21 @@ local function refreshTimer() ----> Display the new time on client-side
 end
 
 local function roundIntro()
-	displayMsg("Attention, residents of Smallville!", 4).Wait()
-	displayMsg("It's been brought to my attention that aliens have invaded our town!", 4).Wait()
-	displayMsg("Why? Don't ask me! I've never even seen one!", 4).Wait()
-	displayMsg("Anyways, we should be fine.", 4).Wait()
-	displayMsg("The military's on their way to extract us.", 4).Wait()
-	displayMsg("Until then, we're under quarantine.", 4).Wait()
-	displayMsg("Stay sharp, and stay alive!", 4, true).Wait()
+	displayMsg("Attention, residents of [REPLACE ME]!", 2.5).Wait()
+	displayMsg("It's been brought to my attention that aliens have invaded our town!", 2.5).Wait()
+	displayMsg("Why? Don't ask me! I've never even seen one!", 2.5).Wait()
+	displayMsg("Anyways, we should be fine.", 2.5).Wait()
+	displayMsg("The military's on their way to extract us.", 2.5).Wait()
+	displayMsg("Until then, we're under quarantine.", 2.5).Wait()
+	displayMsg("Stay sharp, and stay alive!", 2.5, true).Wait()
 end
 
 local function roundEpilogue()
-	displayMsg("Shortly after these events, the military arrived.", 4).Wait()
-	displayMsg("In the end, the aliens were defeated.", 4).Wait()
-	displayMsg("# residents made it out alive...", 4).Wait()
-	displayMsg("...others are in critical condition, but many are dead.", 4).Wait()
-	displayMsg("Hopefully, this is the first and last we'll time hear of an alien infiltration.", 4, true).Wait()
+	displayMsg("Shortly after these events, the military arrived.", 2.5).Wait()
+	displayMsg("In the end, the aliens were defeated.", 2.5).Wait()
+	displayMsg("# residents made it out alive...", 2.5).Wait()
+	displayMsg("...others are in critical condition, but many are dead.", 2.5).Wait()
+	displayMsg("Hopefully, this is the first and last we'll time hear of an alien infiltration.", 2.5, true).Wait()
 end
 
 
@@ -83,6 +83,7 @@ local function initRound() --> Run once @ start of round
 	RM.initPlayers(game.Players:GetPlayers())
 	transitionPeriod()
 	roundIntro()
+	timer = 0
 end
 
 -- Start timer
@@ -102,7 +103,6 @@ local function endRound() --> Run once @ end of round
 end
 
 local function endIntermission() --> Run once @ end of intermission
-	timer = 0
 	initRound()
 end
 
