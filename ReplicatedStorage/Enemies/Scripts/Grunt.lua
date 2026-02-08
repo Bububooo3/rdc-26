@@ -39,7 +39,6 @@ local dt = config:GetAttribute("dt") or 0.5
 local attack_cooldown = config:GetAttribute("AttackCooldown") or 1
 local sight_range = config:GetAttribute("SightRange") or 10
 local wander_distance = 30
-local cooldown_timer = 0
 local min_dist = 5 ----> Minimum distance between targets 1 and 2 needed to actually change trajectory
 
 local raycast_params = RaycastParams.new()
@@ -341,6 +340,7 @@ local grunt: Enemy = {
 
 
 	init = function(self: Enemy) ----> Runs assuming char has just been placed @ a spawn location in the workspace
+		self.char.Humanoid.WalkSpeed = self.speed
 		self:scan()
 	end,
 }
@@ -354,8 +354,6 @@ grunt:init()
 -----------------------------------------------------------------------
 -- Periodic behavior
 while task.wait(dt) do
-	cooldown_timer += dt
-
 	if grunt.hp <= 0 then break end ----> "Died" condition
 
 	grunt.periodic(dt)
