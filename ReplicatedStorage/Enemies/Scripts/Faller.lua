@@ -9,6 +9,11 @@ type Enemy = {
 	attack_range: number,
 	speed: number,
 
+	jumpAnim: AnimationTrack,
+	walkAnim: AnimationTrack,
+	attackAnim: AnimationTrack,
+	idleAnim: AnimationTrack,
+
 	target: Model?,
 
 	canattack: boolean,
@@ -25,7 +30,8 @@ type Enemy = {
 	periodic: (local_dt: number) -> (), ----> Runs every dt seconds
 	init: () -> (), ----> Runs once @ spawn
 	pathfinding: () -> (), ----> Pre-defined so we can plug it into coroutine (rather than new fxn every time)
-	wanderfinding: () -> () ----> A version of pathfinding meant for when we've got no target in mind
+	wanderfinding: () -> (), ----> A version of pathfinding meant for when we've got no target in mind
+	animate: (anim: AnimationTrack) -> () ----> Runs this one animation, and stops all others
 }
 
 -----------------------------------------------------------------------
@@ -40,6 +46,7 @@ local attack_cooldown = config:GetAttribute("AttackCooldown") or 1
 local sight_range = 100000 ----> Gets changed after init
 local wander_distance = 30
 local min_dist = 5 ----> Minimum distance between targets 1 and 2 needed to actually change trajectory
+local jump_power = 50 ----> (For linearvelocity)
 local drop_height = 10
 
 local raycast_params = RaycastParams.new()
@@ -59,6 +66,22 @@ local agent_params = {
 	}
 }
 
+local anim_j = Instance.new("Animation")
+anim_j.Parent = script.Parent.Humanoid
+anim_j.AnimationId = "rbxassetid://"..script.Parent:GetAttribute("JumpAnimID")
+
+local anim_w = Instance.new("Animation")
+anim_w.Parent = script.Parent.Humanoid
+anim_w.AnimationId = "rbxassetid://"..script.Parent:GetAttribute("WalkAnimID")
+
+local anim_a = Instance.new("Animation")
+anim_a.Parent = script.Parent.Humanoid
+anim_a.AnimationId = "rbxassetid://"..script.Parent:GetAttribute("AttackAnimID")
+
+local anim_i = Instance.new("Animation")
+anim_i.Parent = script.Parent.Humanoid
+anim_i.AnimationId = "rbxassetid://"..script.Parent:GetAttribute("IdleAnimID")
+
 -----------------------------------------------------------------------
 -- Enemy definition
 local faller: Enemy = {
@@ -67,6 +90,10 @@ local faller: Enemy = {
 	hp = script.Parent:GetAttribute("Health"),
 	attack_range = script.Parent:GetAttribute("AttackRange"),
 	speed = script.Parent:GetAttribute("Speed-Mult")*config:GetAttribute("BaseWalkspeed"),
+	jumpAnim = script.Parent.Humanoid.Animator:LoadAnimation(anim_j),
+	walkAnim = script.Parent.Humanoid.Animator:LoadAnimation(anim_w),
+	attackAnim = script.Parent.Humanoid.Animator:LoadAnimation(anim_a),
+	idleAnim = script.Parent.Humanoid.Animator:LoadAnimation(anim_i),
 	target = nil,
 	canattack = true,
 	canmove = false, 
@@ -85,8 +112,15 @@ local faller: Enemy = {
 			Vector3.new(self.target.HumanoidRootPart.Position.X, self.char.HumanoidRootPart.Position.Y, self.target.HumanoidRootPart.Position.Z))
 		)
 
-		-- [PLAY ANIMATION & DEAL DAMAGE HERE]
-
+		self:animate(self.attackAnim)
+		
+		pcall(function()
+			local currentHealth = self.target:GetAttribute("Health")
+			self.target:SetAttribute("Health", currentHealth - self.dmg)
+		end)
+		
+		self.attackAnim.Ended:Wait()
+		
 		-- Cooldown
 		task.delay(attack_cooldown, function()
 			self.canattack = true
@@ -128,15 +162,19 @@ local faller: Enemy = {
 			-- I came to win, battle me, that's a sin
 			-- Hold up this writing is fire
 			if waypoint.Action == Enum.PathWaypointAction.Jump then
+				self.jumpAnim:Play()
+				
 				self.char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(
 					self.char.HumanoidRootPart.AssemblyLinearVelocity.X,
-					50,
+					jump_power,
 					self.char.HumanoidRootPart.AssemblyLinearVelocity.Z
 				)
 			end
 
+
 			-- Incremental bc we want smooth movement
 			while dist_scalar > 0.5 do
+				self:animate(self.walkAnim)
 				if not self.canmove then break end
 				if not self.target then break end
 				if self.hp <= 0 then break end
@@ -157,13 +195,15 @@ local faller: Enemy = {
 				task.wait(0.05) -- Smooth movement updates
 			end
 		end
-
+		
 		blockedConnection:Disconnect()
+		
+		self:animate(self.idleAnim)
 	end,
 
 	wanderfinding = function(self: Enemy)
 		-- Random location on a 2D plane within a radius
-		local goal_pos = self.char.HumanoidRootPart.Position + Vector3.new(
+		local offset_goal = self.char.HumanoidRootPart.Position + Vector3.new(
 			RNG:NextInteger(-wander_distance, wander_distance),
 			0,
 			RNG:NextInteger(-wander_distance, wander_distance)
@@ -172,7 +212,7 @@ local faller: Enemy = {
 		local path = PS:CreatePath(agent_params)
 
 		local success, errorMessage = pcall(function()
-			path:ComputeAsync(self.char.HumanoidRootPart.Position, goal_pos)
+			path:ComputeAsync(self.char.HumanoidRootPart.Position, offset_goal)
 		end)
 
 		if not success or path.Status ~= Enum.PathStatus.Success then return end
@@ -196,14 +236,18 @@ local faller: Enemy = {
 			local dist_scalar = dist_vector.Magnitude
 
 			if waypoint.Action == Enum.PathWaypointAction.Jump then
+				self.jumpAnim:Play()
+				
 				self.char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(
 					self.char.HumanoidRootPart.AssemblyLinearVelocity.X,
-					50,
+					jump_power,
 					self.char.HumanoidRootPart.AssemblyLinearVelocity.Z
 				)
 			end
 
+			
 			while dist_scalar > 0.5 do ----> Get within a .5 stud radius of the waypoint
+				self:animate(self.walkAnim)
 				if not self.canmove then break end
 				if self.target then break end -- Stop if target found
 				if self.hp <= 0 then break end
@@ -211,7 +255,7 @@ local faller: Enemy = {
 				dist_vector = (waypoint.Position - self.char.PrimaryPart.Position)
 				dist_scalar = dist_vector.Magnitude
 
-				local moveStep = math.min(self.speed * 0.05, dist_scalar)
+				local moveStep = math.min(self.speed * 0.05, dist_scalar) ----> Little steps
 				self.char:PivotTo(self.char:GetPivot() * CFrame.new(0, 0, -moveStep))
 
 				-- Watch your step, little bro...
@@ -219,7 +263,7 @@ local faller: Enemy = {
 					self.char.PrimaryPart.Position,
 					Vector3.new(waypoint.Position.X, self.char.HumanoidRootPart.Position.Y, waypoint.Position.Z)
 				)
-
+				
 				self.char:PivotTo(lookAt * CFrame.new(0, 0, 0))
 
 				task.wait(0.05)
@@ -227,6 +271,8 @@ local faller: Enemy = {
 		end
 
 		blockedConnection:Disconnect()
+		
+		self:animate(self.idleAnim)
 
 		task.wait(RNG:NextInteger(2, 5)) ----> chillax a little
 		self.canmove = false ----> Time to get going again...
@@ -352,12 +398,27 @@ local faller: Enemy = {
 
 		sight_range = config:GetAttribute("SightRange")
 	end,
+	
+	animate = function(self: Enemy, anim: AnimationTrack)
+		if anim.IsPlaying then return end
+		
+		for _, v in {self.attackAnim, self.idleAnim, self.walkAnim,  self.jumpAnim} do
+			if v == anim then continue end
+			v:Stop()
+		end
+		
+		anim:Play()
+	end,
 }
 
 
 -----------------------------------------------------------------------
 -- Startup behavior
 faller:init()
+
+while math.abs(faller.char.HumanoidRootPart.AssemblyLinearVelocity.Y) > 1 do
+	task.wait(dt)
+end
 
 
 -----------------------------------------------------------------------
