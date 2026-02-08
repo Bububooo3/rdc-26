@@ -341,6 +341,7 @@ local faller: Enemy = {
 
 
 	init = function(self: Enemy) ----> Runs assuming char has just been placed @ a spawn location in the workspace
+		self.char.Humanoid.WalkSpeed = self.speed
 		self:scan()
 
 		if self.target then
