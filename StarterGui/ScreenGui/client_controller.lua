@@ -14,7 +14,7 @@ displayMsg_event.OnClientEvent:Connect(function(msg: string, dur: number, disabl
 	local current = last_input
 	
 	msg_box.Text = msg
-	msg_box.Visible = true
+	msg_box.Parent.Visible = true
 	task.wait(dur)
 	
 	if not (last_input == current) then return end -- prevent overwriting a new msg if server and client r async
