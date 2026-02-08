@@ -5,6 +5,7 @@ local displayMsg_event = events:WaitForChild("displayMsg")
 local refreshTimer_event = events:WaitForChild("refreshTimer")
 
 local UI = script.Parent
+local SG = game:GetService("StarterGui")
 local msg_box = UI:WaitForChild("message_frame"):WaitForChild("msg_box")
 local timer_box = UI:WaitForChild("round_info_frame"):WaitForChild("timer")
 local last_input = 0
@@ -14,6 +15,8 @@ displayMsg_event.OnClientEvent:Connect(function(msg: string, dur: number, disabl
 	local current = last_input
 	
 	msg_box.Text = msg
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	msg_box.Parent.Visible = true
 	task.wait(dur)
 	
@@ -22,6 +25,8 @@ displayMsg_event.OnClientEvent:Connect(function(msg: string, dur: number, disabl
 	
 	if not disable then return end -- QoL
 	msg_box.Parent.Visible = false
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
 end)
 
 refreshTimer_event.OnClientEvent:Connect(function(t: number)
