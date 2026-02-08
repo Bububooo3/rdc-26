@@ -27,13 +27,9 @@ local RM = require(script:WaitForChild("RoundManager"))
 
 -----------------------------------------------------------------------
 -- Utility functions
-local function moveMeTo(char: Model, cf: CFrame)
-	char:PivotTo(cf)
-end
-
 local function teleportPlrs() ----> Move all plrs based on whether the game's going on
 	for _, plr in game.Players:GetPlayers() do
-		pcall(moveMeTo, plr.Character, (round_ongoing) and round_spawns[RNG:NextInteger(1, num_round_spawns)] or intermission_spawn)
+		pcall(plr.Character.PivotTo, plr.Character, (round_ongoing) and round_spawns[RNG:NextInteger(1, num_round_spawns)] or intermission_spawn)
 		task.wait()
 	end
 end
@@ -83,6 +79,7 @@ end
 -- TP plrs, fire bindable event, fire remote event, start timer
 local function initRound() --> Run once @ start of round
 	round_ongoing = true
+	RM.reset()
 	RM.initPlayers(game.Players:GetPlayers())
 	transitionPeriod()
 	roundIntro()
@@ -115,7 +112,7 @@ local function roundPeriodic(dt: number) --> Run every heartbeat while round is 
 	if RM.wave_times[timer] then
 		RM.spawnWave(RM.wave_times[timer])
 	end
-	
+
 	if timer < round_length then return end
 	endRound()
 end
