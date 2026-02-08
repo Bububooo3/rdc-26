@@ -47,7 +47,7 @@ local function displayMsg(msg: string, t: number, disable: boolean)
 end
 
 local function refreshTimer() ----> Display the new time on client-side
-	pcall(refreshTimer_event.FireAllClients, refreshTimer_event, timer//1)
+	pcall(refreshTimer_event.FireAllClients, refreshTimer_event, ((round_ongoing) and round_length or intermission_length) - timer//1)
 end
 
 local function roundIntro()
@@ -81,8 +81,8 @@ local function initRound() --> Run once @ start of round
 	round_ongoing = true
 	RM.reset()
 	RM.initPlayers(game.Players:GetPlayers())
-	transitionPeriod()
 	roundIntro()
+	transitionPeriod()
 	timer = 0
 end
 
