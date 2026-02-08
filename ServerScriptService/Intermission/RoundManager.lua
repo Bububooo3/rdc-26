@@ -24,14 +24,21 @@ local enemy_spawns = {
 	["D"] = CS:GetTagged("D")
 }
 
---	[Wave #] = {time_passed, {allowed_enemies}, #spawn_base_value, per-plr-spawn-multiplier}
+local enemy_prices = {
+	["A"] = 1,
+	["B"] = 0,
+	["C"] = 0,
+	["D"] = 0
+}
+
+--	[Wave #] = {time_passed, {allowed_enemies}, cost, per-plr-spawn-multiplier}
 local waves = {
 	[1] = {5, {"A"}, 3, 1.5},
-	[2] = {65, {"A", "C", "D"}, 6, 2},
-	[3] = {125, {"B"}, 9, 2},
-	[4] = {185, {"A", "C", "D"}, 10, 2.5},
-	[5] = {245, {"A", "B"}, 10, 2.5},
-	[6] = {305, {"C", "D"}, 10 , 3}
+	[2] = {65, {"A", "B"}, 6, 2},
+	[3] = {125, {"A", "B", "C"}, 9, 2},
+	[4] = {185, {"A", "B", "C", "D"}, 10, 2.5},
+	[5] = {245, {"A", "B", "C", "D"}, 10, 3},
+	[6] = {305, {"A", "B", "C", "D"}, 50 , 4}
 }
 
 manager.wave_times = {
@@ -45,7 +52,7 @@ manager.wave_times = {
 
 local plrs_alive: Players = {}
 
-local function distributeEnemyHealth(provider_health: number, hit: boolean) ----> Give leftover health to youngest enemy upon natural death
+local function distributeEnemyHealth(provider_health: number, hit: boolean) ----> Give leftover health to youngest few enemies upon natural death
 	if hit then return end
 end
 
@@ -63,12 +70,22 @@ function manager.spawnWave(wave: number)
 	if not waves[wave] then return end
 
 	local wave_data = waves[wave]
-	local spawn_num = wave_data[3] + math.floor(wave_data[4]^(#plrs_alive))
+	local cost = wave_data[3] + math.floor(wave_data[4]^(#plrs_alive))
 
-	for i=0, spawn_num, 1 do
-		manager.spawnEnemy(wave_data[2][RNG:NextInteger(1, #wave_data[2])])
-		task.wait(spawn_num//5) ---> Spawning a wave takes around 5 seconds
+	while cost > 0 do
+		local new_enemy = wave_data[2][RNG:NextInteger(1, #wave_data[2])]
+		
+		while (enemy_prices[new_enemy] > cost) do
+			new_enemy = wave_data[2][RNG:NextInteger(1, #wave_data[2])]
+		end
+		
+		manager.spawnEnemy(new_enemy)
+		
+		cost -= enemy_prices[new_enemy]
+		
+		task.wait()
 	end
+
 
 	waves_spawned += 1
 end
@@ -99,7 +116,7 @@ function manager.stripPlayers()
 	for _, conn in connections do
 		conn:Disconnect()
 	end
-	
+
 	for _, plr in Players:GetPlayers() do
 		if not plr.Character then continue end
 
