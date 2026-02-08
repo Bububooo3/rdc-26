@@ -8,6 +8,7 @@ local DS = game:GetService("Debris")
 local manager = {}
 
 local waves_spawned = 0
+local coop_cost_dampener = 1 -- Weight for per-wave cost
 local connections: RBXScriptConnection = {}
 
 local enemies = {
@@ -18,27 +19,37 @@ local enemies = {
 }
 
 local enemy_spawns = {
-	["A"] = CS:GetTagged("A"),
-	["B"] = CS:GetTagged("B"),
-	["C"] = CS:GetTagged("C"),
-	["D"] = CS:GetTagged("D")
+	["A"] = CS:GetTagged("A"), -- Grunt
+	["B"] = CS:GetTagged("B"), -- Faller
+	["C"] = CS:GetTagged("C"), -- Jumper
+	["D"] = CS:GetTagged("D") -- Surveyor
 }
 
-local enemy_prices = {
-	["A"] = 1,
-	["B"] = 0,
-	["C"] = 0,
-	["D"] = 0
+local function calcPrice(enemy: string)
+	if not enemies[enemy] then return end
+
+	local data = enemies[enemy]:GetAttributes()
+
+	-- Multiplying stats by weights to get costs
+	return math.max(3, data["Health"]*1.5 + data["Damage"]*2 + data["Speed-Mult"]*1)
+end
+
+-- TODO: figure out enemy prices
+local enemy_prices: {number} = {
+	["A"] = calcPrice("A"), -- Grunt
+	["B"] = calcPrice("B"), -- Faller
+	["C"] = calcPrice("C"), -- Jumper
+	["D"] = calcPrice("D") -- Surveyor
 }
 
---	[Wave #] = {time_passed, {allowed_enemies}, cost, per-plr-spawn-multiplier}
-local waves = {
-	[1] = {5, {"A"}, 3, 1.5},
-	[2] = {65, {"A", "B"}, 6, 2},
-	[3] = {125, {"A", "B", "C"}, 9, 2},
-	[4] = {185, {"A", "B", "C", "D"}, 10, 2.5},
-	[5] = {245, {"A", "B", "C", "D"}, 10, 3},
-	[6] = {305, {"A", "B", "C", "D"}, 50 , 4}
+--	[Wave #] = {time, {enemies}, base_cost, player_multiplier}
+local waves = {							-- (cost calculations)
+	[1] = {5, {"A"}, 12, 1.4},           -- Solo: 12, Duo: 16.8, Trio: 23.5, Quad: 32.9
+	[2] = {65, {"A", "B"}, 28, 1.5},     -- Solo: 28, Duo: 42, Trio: 63, Quad: 94.5
+	[3] = {125, {"A", "B", "C"}, 50, 1.6}, -- Solo: 50, Duo: 80, Trio: 128, Quad: 204.8
+	[4] = {185, {"A", "B", "C", "D"}, 80, 1.7},   -- Solo: 80, Duo: 136, Trio: 231.2, Quad: 393
+	[5] = {245, {"A", "B", "C", "D"}, 120, 1.8},  -- Solo: 120, Duo: 216, Trio: 388.8, Quad: 699.8
+	[6] = {305, {"A", "B", "C", "D"}, 180, 2.0}   -- Solo: 180, Duo: 360, Trio: 720, Quad: 1440
 }
 
 manager.wave_times = {
@@ -70,19 +81,25 @@ function manager.spawnWave(wave: number)
 	if not waves[wave] then return end
 
 	local wave_data = waves[wave]
-	local cost = wave_data[3] + math.floor(wave_data[4]^(#plrs_alive))
+	local cost = math.floor(wave_data[3] * wave_data[4]^(#plrs_alive - 1) * coop_cost_dampener)
 
-	while cost > 0 do
+	-- Find the cheapest enemy available in this wave
+	local min_price = math.huge
+	for _, enemy_type in wave_data[2] do
+		min_price = math.min(min_price, enemy_prices[enemy_type])
+	end
+
+	while cost >= min_price do
 		local new_enemy = wave_data[2][RNG:NextInteger(1, #wave_data[2])]
-		
+
 		while (enemy_prices[new_enemy] > cost) do
 			new_enemy = wave_data[2][RNG:NextInteger(1, #wave_data[2])]
 		end
-		
+
 		manager.spawnEnemy(new_enemy)
-		
+
 		cost -= enemy_prices[new_enemy]
-		
+
 		task.wait()
 	end
 
