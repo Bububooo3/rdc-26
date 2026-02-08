@@ -20,9 +20,10 @@ local round_ongoing = false
 
 local RS = game:GetService("ReplicatedStorage")
 local fxns, events = RS:WaitForChild("Functions"), RS:WaitForChild("Events")
-local refreshTimer = fxns:WaitForChild("refreshTimer")
-local displayMsg = fxns:WaitForChild("displayMsg")
+local refreshTimer_event = events:WaitForChild("refreshTimer")
+local displayMsg_event = events:WaitForChild("displayMsg")
 
+local RM = require(script:WaitForChild("RoundManager"))
 
 -----------------------------------------------------------------------
 -- Utility functions
@@ -37,18 +38,40 @@ local function teleportPlrs() ----> Move all plrs based on whether the game's go
 	end
 end
 
-local function postMsg(msg: string)
-	for _, plr in game.Players:GetPlayers() do ----> Display new message on client-side
-		pcall(displayMsg.InvokeClient, displayMsg, plr, "Server: " .. msg)
-	end
+local function displayMsg(msg: string, t: number)
+	if not msg then msg = "" end
+	t = math.max(0, t) ----> Msg will be "permanent" until a new msg with a set time = t replaces it
+
+	pcall(displayMsg_event.FireAllClients, displayMsg_event, msg, t) ----> Display new message on client-side
+
+	return {Wait = function()
+		task.wait(t)
+	end}
 end
 
-local function updateTimer() ----> Display the new time on client-side
-	for _, plr in game.Players:GetPlayers() do
-		pcall(refreshTimer.InvokeClient, refreshTimer, plr, timer)
-		task.wait()
-	end
+
+local function refreshTimer() ----> Display the new time on client-side
+	pcall(refreshTimer_event.FireAllClients, refreshTimer_event, timer)
 end
+
+local function roundIntro()
+	displayMsg("Attention, residents of Smallville!", 4).Wait()
+	displayMsg("It's been brought to my attention that aliens have invaded our town!", 4).Wait()
+	displayMsg("Why? Don't ask me! I've never even seen one!", 4).Wait()
+	displayMsg("Anyways, we should be fine.", 4).Wait()
+	displayMsg("The military's on their way to extract us.", 4).Wait()
+	displayMsg("Until then, we're under quarantine.", 4).Wait()
+	displayMsg("Stay sharp, and stay alive!", 4).Wait()
+end
+
+local function roundEnd()
+	displayMsg("Shortly after these events, the military arrived.", 4).Wait()
+	displayMsg("In the end, the aliens were defeated.", 4).Wait()
+	displayMsg("# residents made it out alive...", 4).Wait()
+	displayMsg("...others are in critical condition, but many are dead.", 4).Wait()
+	displayMsg("Hopefully, this is the first and last we'll time hear of an alien infiltration.", 4).Wait()
+end
+
 
 -----------------------------------------------------------------------
 -- Initialize main functions
@@ -61,7 +84,7 @@ end
 local function initRound() --> Run once @ start of round
 	round_ongoing = true
 	transitionPeriod()
-
+	roundIntro()
 end
 
 -- Start timer
