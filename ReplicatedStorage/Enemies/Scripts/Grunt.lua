@@ -3,32 +3,41 @@
 -- Outline enemy class
 type Enemy = {
 	char: Model,
+
 	dmg: number,
 	hp: number,
+	attack_range: number,
 	speed: number,
+
 	target: Model?,
+
 	canattack: boolean,
 	canmove: boolean,
+
+	mover: thread,
 
 	attack: () -> (), ----> Pretty self-explanatory
 	wander: () -> (), ----> Use if there's no target rn
 	move: () -> (), ----> Move towards target
-	scan: () -> (Model?), ----> Sets new target
+	scan: () -> (), ----> Sets new target
 	death: () -> (), ----> and there, in my final moments on this planet Earth, I realized the significance of it all...
 	damage: () -> (), ----> Damages enemy based on what's in-range (rn it destroys them, so its projectile-only)
 	periodic: (local_dt: number) -> (), ----> Runs every dt seconds
 	init: () -> (), ----> Runs once @ spawn
+	pathfinding: () -> () ----> Pre-defined so we can plug it into coroutine (rather than new fxn every time)
 }
 
 -----------------------------------------------------------------------
 -- Variables
 local RS = game:GetService("ReplicatedStorage")
 local CS = game:GetService("CollectionService")
+local PS = game:GetService("PathfindingService")
 local config = RS:WaitForChild("Game Settings")
 local dt = config:GetAttribute("dt") or 0.5
 local attack_cooldown = config:GetAttribute("AttackCooldown") or 1
 local sight_range = config:GetAttribute("SightRange") or 10
 local cooldown_timer = 0
+local min_dist = 5 ----> Minimum distance between targets 1 and 2 needed to actually change trajectory
 
 local raycast_params = RaycastParams.new()
 raycast_params.FilterType = Enum.RaycastFilterType.Exclude
@@ -37,34 +46,143 @@ local overlap_params = OverlapParams.new()
 overlap_params.FilterType = Enum.RaycastFilterType.Exclude
 overlap_params.RespectCanCollide = false
 
+local agent_params = {
+	AgentRadius = 3,
+	AgentHeight = 5,
+	AgentCanJump = true,
+	WaypointSpacing = 4,
+	Costs = {
+		Water = 20
+	}
+}
+
 -----------------------------------------------------------------------
 -- Enemy definition
 local grunt: Enemy = {
 	char = script.Parent,
 	dmg = script.Parent:GetAttribute("Damage"),
 	hp = script.Parent:GetAttribute("Health"),
+	attack_range = script.Parent:GetAttribute("AttackRange"),
 	speed = script.Parent:GetAttribute("Speed-Mult")*config:GetAttribute("BaseWalkspeed"),
 	target = nil,
+	canattack = true,
+	canmove = false, 
+	mover = nil,     
 
 
 	attack = function(self: Enemy)
 		if not (self.canattack and self.target) then return end
-		
+
 		self.canattack = false
-		
+		self.canmove = false ----> It's already supposed to be false, but we're playing it safe here.
+
+		-- Look at me. LOOK AT ME. I'm not mad at you... just- disappointed. Do better next time.
+		self.char:PivotTo(CFrame.lookAt(
+			self.char.PrimaryPart.Position,
+			Vector3.new(self.target.HumanoidRootPart.Position.X, self.char.HumanoidRootPart.Position.Y, self.target.HumanoidRootPart.Position.Z))
+		)
+
+		-- [PLAY ANIMATION & DEAL DAMAGE HERE]
+
 		-- Cooldown
 		task.delay(attack_cooldown, function()
 			self.canattack = true
 		end)
 	end,
-	
+
 	wander = function(self: Enemy) ----> Do later if we have time. rn, no wandering. essentials come first.
-		return
+		self.canmove = false
+	end,
+
+	pathfinding = function(self: Enemy)
+		if not self.target then return end
+
+		local path = PS:CreatePath(agent_params)
+
+		local success, errorMessage = pcall(function()
+			path.ComputeAsync(self.char.HumanoidRootPart.Position, self.target.HumanoidRootPart.Position)
+		end)
+
+		if not success or path.Status ~= Enum.PathStatus.Success then return end
+
+		local waypoints = path:GetWaypoints()
+
+		-- Blocked event handler
+		local blockedConnection = path.Blocked:Connect(function(waypointIndex)
+			if waypointIndex > 1 then
+				self.canmove = false
+			end
+		end)
+
+		-- cycle time
+		for i, waypoint in ipairs(waypoints) do
+			-- check every time bc it's a coroutine
+			if not self.canmove then break end
+			if not self.target then break end
+			if self.hp <= 0 then break end
+
+			-- Move to waypoint smoothly
+			local dist_vector = (waypoint.Position - self.char.HumanoidRootPart.Position)
+			local dist_scalar = dist_vector.Magnitude
+
+			-- Jump around! I'm so clever, guys.
+			-- Pack it up, pack it in, let me begin
+			-- I came to win, battle me, that's a sin
+			-- Hold up this writing is fire
+			if waypoint.Action == Enum.PathWaypointAction.Jump then
+				self.char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(
+					self.char.HumanoidRootPart.AssemblyLinearVelocity.X,
+					50,
+					self.char.HumanoidRootPart.AssemblyLinearVelocity.Z
+				)
+			end
+
+			-- Incremental bc we want smooth movement
+			while dist_scalar > 0.5 do
+				if not self.canmove then break end
+				if not self.target then break end
+				if self.hp <= 0 then break end
+
+				dist_vector = (waypoint.Position - self.char.PrimaryPart.Position)
+				dist_scalar = dist_vector.Magnitude
+
+				local moveStep = math.min(self.speed * 0.05, dist_scalar) -- incremental movement
+				self.char:PivotTo(self.char:GetPivot() * CFrame.new(0, 0, -moveStep))
+
+				-- Watch where you're going!
+				local lookAt = CFrame.lookAt(
+					self.char.PrimaryPart.Position,
+					Vector3.new(waypoint.Position.X, self.char.HumanoidRootPart.Position.Y, waypoint.Position.Z)
+				)
+				self.char:PivotTo(lookAt * CFrame.new(0, 0, 0))
+
+				task.wait(0.05) -- Smooth movement updates
+			end
+		end
+
+		blockedConnection:Disconnect()
 	end,
 
 	move = function(self: Enemy)
 		if not self.target then self:wander() return end
-		
+
+		-- Check if we're in attack range		
+		if (self.target.HumanoidRootPart.Position - self.char.PrimaryPart.Position).Magnitude <= self.attack_range then
+			self.canmove = false
+			self:attack()
+			return
+		end
+
+		-- Start new movement coroutine if none exists or previous finished
+		if not self.mover or coroutine.status(self.mover) == "dead" then
+			self.canmove = true
+
+			self.mover = coroutine.create(function()
+				self:pathfinding()
+			end)
+
+			coroutine.resume(self.mover)
+		end
 	end,
 
 	scan = function(self: Enemy)
@@ -102,10 +220,20 @@ local grunt: Enemy = {
 			if (dist_vector.Magnitude < dist) then closest_avaliable = unknown end
 		end
 
+		-- Only matters if the change in location isn't neglibile by our own definition (min_dist)
+		if self.target ~= closest_avaliable then 
+			self.canmove = false
+		elseif closest_avaliable and self.target then
+			if (self.target.HumanoidRootPart.Position - closest_avaliable.HumanoidRootPart.Position).Magnitude > 10 then
+				self.canmove = false -- Force recalculation of path
+			end
+		end
+
 		self.target = closest_avaliable
 	end,
-	
+
 	death = function(self: Enemy) ----> We can add stuff later
+		self.canmove = false
 		self.char:Destroy()
 	end,
 
@@ -120,7 +248,7 @@ local grunt: Enemy = {
 
 			if (self.hp <= 0) then break end
 		end
-		
+
 		if (self.hp <= 0) then self:death() end
 	end,
 
@@ -139,7 +267,7 @@ local grunt: Enemy = {
 
 -----------------------------------------------------------------------
 -- Startup behavior
-grunt.init()
+grunt:init()
 
 
 -----------------------------------------------------------------------
