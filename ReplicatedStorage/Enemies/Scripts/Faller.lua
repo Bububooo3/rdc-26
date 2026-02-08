@@ -40,7 +40,7 @@ local attack_cooldown = config:GetAttribute("AttackCooldown") or 1
 local sight_range = 100000 ----> Gets changed after init
 local wander_distance = 30
 local min_dist = 5 ----> Minimum distance between targets 1 and 2 needed to actually change trajectory
-local drop_height = 50
+local drop_height = 10
 
 local raycast_params = RaycastParams.new()
 raycast_params.FilterType = Enum.RaycastFilterType.Exclude
