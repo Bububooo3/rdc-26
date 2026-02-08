@@ -24,7 +24,8 @@ type Enemy = {
 	damage: () -> (), ----> Damages enemy based on what's in-range (rn it destroys them, so its projectile-only)
 	periodic: (local_dt: number) -> (), ----> Runs every dt seconds
 	init: () -> (), ----> Runs once @ spawn
-	pathfinding: () -> () ----> Pre-defined so we can plug it into coroutine (rather than new fxn every time)
+	pathfinding: () -> (), ----> Pre-defined so we can plug it into coroutine (rather than new fxn every time)
+	wanderfinding: () -> () ----> A version of pathfinding meant for when we've got no target in mind
 }
 
 -----------------------------------------------------------------------
@@ -32,10 +33,12 @@ type Enemy = {
 local RS = game:GetService("ReplicatedStorage")
 local CS = game:GetService("CollectionService")
 local PS = game:GetService("PathfindingService")
+local RNG = Random.new()
 local config = RS:WaitForChild("Game Settings")
 local dt = config:GetAttribute("dt") or 0.5
 local attack_cooldown = config:GetAttribute("AttackCooldown") or 1
 local sight_range = config:GetAttribute("SightRange") or 10
+local wander_distance = 30
 local cooldown_timer = 0
 local min_dist = 5 ----> Minimum distance between targets 1 and 2 needed to actually change trajectory
 
@@ -90,10 +93,6 @@ local grunt: Enemy = {
 		end)
 	end,
 
-	wander = function(self: Enemy) ----> Do later if we have time. rn, no wandering. essentials come first.
-		self.canmove = false
-	end,
-
 	pathfinding = function(self: Enemy)
 		if not self.target then return end
 
@@ -107,8 +106,7 @@ local grunt: Enemy = {
 
 		local waypoints = path:GetWaypoints()
 
-		-- Blocked event handler
-		local blockedConnection = path.Blocked:Connect(function(waypointIndex)
+		local blockedConnection = path.Blocked:Connect(function(waypointIndex) ----> Basically an emergency stop
 			if waypointIndex > 1 then
 				self.canmove = false
 			end
@@ -161,6 +159,89 @@ local grunt: Enemy = {
 		end
 
 		blockedConnection:Disconnect()
+	end,
+
+	wanderfinding = function(self: Enemy)
+		-- Random location on a 2D plane within a radius
+		local goal_pos = self.char.HumanoidRootPart.Position + Vector3.new(
+			RNG:NextInteger(-wander_distance, wander_distance),
+			0,
+			RNG:NextInteger(-wander_distance, wander_distance)
+		)
+
+		local path = PS:CreatePath(agent_params)
+
+		local success, errorMessage = pcall(function()
+			path:ComputeAsync(self.char.HumanoidRootPart.Position, goal_pos)
+		end)
+
+		if not success or path.Status ~= Enum.PathStatus.Success then return end
+
+		local waypoints = path:GetWaypoints()
+
+		local blockedConnection = path.Blocked:Connect(function(waypointIndex) ----> e-stop
+			if waypointIndex > 1 then
+				self.canmove = false
+			end
+		end)
+
+		-- cycle time again.
+		for i, waypoint in ipairs(waypoints) do
+			-- Check if we found a target (scan will set canmove to false)
+			if not self.canmove then break end
+			if self.target then break end -- Stop wandering if target found
+			if self.hp <= 0 then break end
+
+			local dist_vector = (waypoint.Position - self.char.HumanoidRootPart.Position)
+			local dist_scalar = dist_vector.Magnitude
+
+			if waypoint.Action == Enum.PathWaypointAction.Jump then
+				self.char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(
+					self.char.HumanoidRootPart.AssemblyLinearVelocity.X,
+					50,
+					self.char.HumanoidRootPart.AssemblyLinearVelocity.Z
+				)
+			end
+
+			while dist_scalar > 0.5 do ----> Get within a .5 stud radius of the waypoint
+				if not self.canmove then break end
+				if self.target then break end -- Stop if target found
+				if self.hp <= 0 then break end
+
+				dist_vector = (waypoint.Position - self.char.PrimaryPart.Position)
+				dist_scalar = dist_vector.Magnitude
+
+				local moveStep = math.min(self.speed * 0.05, dist_scalar)
+				self.char:PivotTo(self.char:GetPivot() * CFrame.new(0, 0, -moveStep))
+
+				-- Watch your step, little bro...
+				local lookAt = CFrame.lookAt(
+					self.char.PrimaryPart.Position,
+					Vector3.new(waypoint.Position.X, self.char.HumanoidRootPart.Position.Y, waypoint.Position.Z)
+				)
+				
+				self.char:PivotTo(lookAt * CFrame.new(0, 0, 0))
+
+				task.wait(0.05)
+			end
+		end
+
+		blockedConnection:Disconnect()
+
+		task.wait(RNG:NextInteger(2, 5)) ----> chillax a little
+		self.canmove = false ----> Time to get going again...
+	end,
+
+	wander = function(self: Enemy) ----> Ok, we did a thing.
+		if not self.mover or coroutine.status(self.mover) == "dead" then
+			self.canmove = true
+
+			self.mover = coroutine.create(function()
+				self:wanderfinding()
+			end)
+
+			coroutine.resume(self.mover)
+		end
 	end,
 
 	move = function(self: Enemy)
