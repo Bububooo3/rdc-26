@@ -71,6 +71,11 @@ function manager.spawnEnemy(enemy: string)
 	if not enemies[enemy] then return end
 
 	local rig = enemies[enemy]:Clone()
+
+	local controller = enemy_fldr["Scripts"][rig.Name]:Clone()
+	controller.Parent = rig
+	controller.Enabled = true
+
 	rig.Parent = workspace
 	rig:PivotTo(enemy_spawns[enemy][RNG:NextInteger(1, #enemy_spawns[enemy])].CFrame)
 	DS:AddItem(rig, 60)
