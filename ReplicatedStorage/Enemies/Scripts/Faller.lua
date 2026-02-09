@@ -426,7 +426,7 @@ end
 while task.wait(dt) do
 	if faller.hp <= 0 then break end ----> "Died" condition
 
-	faller.periodic(dt)
+	faller:periodic(dt)
 end
 
 -----------------------------------------------------------------------
