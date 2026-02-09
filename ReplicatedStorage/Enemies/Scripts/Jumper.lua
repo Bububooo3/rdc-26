@@ -441,7 +441,7 @@ jumper:init()
 while task.wait(dt) do
 	if jumper.hp <= 0 then break end ----> "Died" condition
 
-	jumper.periodic(dt)
+	jumper:periodic(dt)
 end
 
 -----------------------------------------------------------------------
