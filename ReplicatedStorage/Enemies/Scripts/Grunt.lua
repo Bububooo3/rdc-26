@@ -379,6 +379,7 @@ local grunt: Enemy = {
 	end,
 
 	periodic = function(self: Enemy, local_dt: number)
+		print(self)
 		self:damage()
 		self:scan()
 		self:move()
@@ -413,7 +414,7 @@ grunt:init()
 while task.wait(dt) do
 	if grunt.hp <= 0 then break end ----> "Died" condition
 
-	grunt.periodic(dt)
+	grunt:periodic(dt)
 end
 
 -----------------------------------------------------------------------
