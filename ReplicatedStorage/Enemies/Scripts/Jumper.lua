@@ -107,7 +107,7 @@ local jumper: Enemy = {
 
 		-- Look at me. LOOK AT ME. I'm not mad at you... just- disappointed. Do better next time.
 		self.char:PivotTo(CFrame.lookAt(
-			self.char.PrimaryPart.Position,
+			self.char.HumanoidRootPart.Position,
 			Vector3.new(self.target.HumanoidRootPart.Position.X, self.char.HumanoidRootPart.Position.Y, self.target.HumanoidRootPart.Position.Z))
 		)
 
@@ -178,7 +178,7 @@ local jumper: Enemy = {
 				if not self.target then break end
 				if self.hp <= 0 then break end
 
-				dist_vector = (waypoint.Position - self.char.PrimaryPart.Position)
+				dist_vector = (waypoint.Position - self.char.HumanoidRootPart.Position)
 				dist_scalar = dist_vector.Magnitude
 
 				local moveStep = math.min(self.speed * 0.05, dist_scalar) -- incremental movement
@@ -186,7 +186,7 @@ local jumper: Enemy = {
 
 				-- Watch where you're going!
 				local lookAt = CFrame.lookAt(
-					self.char.PrimaryPart.Position,
+					self.char.HumanoidRootPart.Position,
 					Vector3.new(waypoint.Position.X, self.char.HumanoidRootPart.Position.Y, waypoint.Position.Z)
 				)
 				self.char:PivotTo(lookAt * CFrame.new(0, 0, 0))
@@ -251,7 +251,7 @@ local jumper: Enemy = {
 				if self.target then break end -- Stop if target found
 				if self.hp <= 0 then break end
 
-				dist_vector = (waypoint.Position - self.char.PrimaryPart.Position)
+				dist_vector = (waypoint.Position - self.char.HumanoidRootPart.Position)
 				dist_scalar = dist_vector.Magnitude
 
 				local moveStep = math.min(self.speed * 0.05, dist_scalar) ----> Little steps
@@ -259,7 +259,7 @@ local jumper: Enemy = {
 
 				-- Watch your step, little bro...
 				local lookAt = CFrame.lookAt(
-					self.char.PrimaryPart.Position,
+					self.char.HumanoidRootPart.Position,
 					Vector3.new(waypoint.Position.X, self.char.HumanoidRootPart.Position.Y, waypoint.Position.Z)
 				)
 				
@@ -292,7 +292,7 @@ local jumper: Enemy = {
 	move = function(self: Enemy)
 		if not self.target then self:wander() return end
 		
-		local diff = (self.target.HumanoidRootPart.Position - self.char.PrimaryPart.Position).Magnitude
+		local diff = (self.target.HumanoidRootPart.Position - self.char.HumanoidRootPart.Position).Magnitude
 		
 		-- Check if we're in attack range		
 		if diff <= self.attack_range then
@@ -347,7 +347,7 @@ local jumper: Enemy = {
 			-- R u a player?
 			if not (CS:HasTag(unknown, "Player")) then continue end
 
-			local dist_vector = (unknown.HumanoidRootPart.Position - self.char.PrimaryPart.Position)
+			local dist_vector = (unknown.HumanoidRootPart.Position - self.char.HumanoidRootPart.Position)
 
 			-- Can I see you? (radar effect)
 			if CS:HasTag(unknown, "Tagged") and (dist_vector.Magnitude <= sight_range) and (dist_vector.Magnitude < dist) then
@@ -360,7 +360,7 @@ local jumper: Enemy = {
 
 			-- Do the raycast (obstacle check)
 			local raycast_result = workspace:Raycast(
-				self.char.PrimaryPart.Position, ----> From head
+				self.char.HumanoidRootPart.Position,
 				dist_vector.Unit*sight_range,
 				raycast_params
 			)
