@@ -12,9 +12,9 @@ local events = RS:WaitForChild("Events")
 local refreshTimer_event = events:WaitForChild("refreshTimer")
 local displayMsg_event = events:WaitForChild("displayMsg")
 
-local round_length = 15 -- seconds
-local intermission_length = 5 -- seconds
-local transition_length = 10 -- seconds
+local round_length = 600 -- seconds
+local intermission_length = 15 -- seconds
+local transition_length = 3 -- seconds
 local timer = 0 -- seconds
 local dt: number = config:GetAttribute("dt") or 0.5 -- seconds
 local RNG = Random.new()
