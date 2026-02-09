@@ -447,7 +447,7 @@ surveyor:init()
 while task.wait(dt) do
 	if surveyor.hp <= 0 then break end ----> "Died" condition
 
-	surveyor.periodic(dt)
+	surveyor:periodic(dt)
 end
 
 -----------------------------------------------------------------------
